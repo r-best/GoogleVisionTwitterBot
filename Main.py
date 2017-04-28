@@ -24,7 +24,7 @@ for tweet in tweets:
             if 'media' in tweet.entities:
                 image = vision_client.image(source_uri=tweet.entities['media'][0]['media_url'])
                 labels = image.detect_labels()
-                text = "Your picture contains:\n"
+                text = "@" + tweet.user.screen_name + " Your picture contains:\n"
                 for i in range(0, labels.__len__()):
                     temp = text
                     temp += labels[i].description + " - {}%".format(round(labels[i].score * 100, 1))
@@ -35,13 +35,12 @@ for tweet in tweets:
 
                     if i != labels.__len__()-1:
                         text += "\n"
-                print(text)
-                print(str(tweet.id))
-                api.update_status('@' + tweet.user.screen_name + ' ' + text, in_reply_to_status_id=tweet.id)
+                print(labels[0].description + " - {}%".format(round(labels[i].score * 100, 1)) + "  " + str(tweet.id))
+                api.update_status(text, in_reply_to_status_id=tweet.id)
                 done_tweets.append(tweet.id)
                 done_tweets_file.writelines(str(tweet.id) + '\n')
             else:
-                print(str(tweet.id))
+                print("No image - " + str(tweet.id))
                 api.update_status('@' + tweet.user.screen_name + ' ' + "Your tweet did not contain an image", in_reply_to_status_id=tweet.id)
                 done_tweets.append(tweet.id)
                 done_tweets_file.writelines(str(tweet.id) + '\n')
