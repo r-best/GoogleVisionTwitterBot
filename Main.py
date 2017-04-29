@@ -4,20 +4,21 @@ from google.cloud import vision
 
 # Read in the file of tweet IDs that have already been replied to
 # Used to avoid replying to the same tweet twice
+# Could probably be done in a better way but whatever
 done_tweets_file = open('doneTweets.txt', 'r+')
 done_tweets = done_tweets_file.readlines()
 done_tweets = [x.strip() for x in done_tweets]
 
-# Initialize a client for Google Vision API
-vision_client = vision.Client('crafty-plateau-166018')
-
-# Read in the JSON file that contains the API keys for Twitter
+# Read in the JSON file that contains the API keys for Twitter and the project name for Google Vision
 keys = json.loads(open('keys.json').read())
 
 # Initialize Twitter API with keys from JSON file
 auth = tweepy.OAuthHandler(keys['consumer_key'], keys['consumer_secret'])
 auth.set_access_token(keys['access_token'], keys['access_token_secret'])
 api = tweepy.API(auth)
+
+# Initialize a client for Google Vision API
+vision_client = vision.Client(keys['vision_project_name'])
 
 # Search for tweets containing the bot's screen name with an @ in front of it
 tweets = api.search(q='@bobbys_bot_test', rpp=100, show_user=1, include_entities=1)
