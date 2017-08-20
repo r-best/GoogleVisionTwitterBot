@@ -1,13 +1,18 @@
-import tweepy
+from datetime import datetime
+import re
 import json
+import tweepy
 from google.cloud import vision
 
-# Read in the file of tweet IDs that have already been replied to
-# Used to avoid replying to the same tweet twice
-# Could probably be done in a better way but whatever
-done_tweets_file = open('doneTweets.txt', 'r+')
-done_tweets = done_tweets_file.readlines()
-done_tweets = [x.strip() for x in done_tweets]
+# Constants
+BOT_NAME = 'bobbys_bot_test'
+
+# Read in the last update time from file
+date_file = open('lastupdate.txt', 'r+')
+temp = re.split(' |-|:|\\.', date_file.readline())
+temp = [int(x) for x in temp]
+last_update = datetime(temp[0], temp[1], temp[2], temp[3]+4, temp[4], temp[5])
+print("LAST UPDATE: "+str(last_update))
 
 # Read in the JSON file that contains the API keys for Twitter and the project name for Google Vision
 keys = json.loads(open('keys.json').read())
@@ -20,15 +25,21 @@ api = tweepy.API(auth)
 # Initialize a client for Google Vision API
 vision_client = vision.Client(keys['vision_project_name'])
 
+# Save new "last updated" time to save to file at end
+new_update_time = datetime.now()
+
 # Search for tweets containing the bot's screen name with an @ in front of it
-tweets = api.search(q='@bobbys_bot_test', rpp=100, show_user=1, include_entities=1)
+tweets = api.search(q=('@'+BOT_NAME), rpp=100, show_user=1, include_entities=1)
 for tweet in tweets:
     # Skip the tweet if it's already been replied to or it's a tweet made by the bot
-    if done_tweets.__contains__(str(tweet.id)) or tweet.user.screen_name == 'bobbys_bot_test':
+    if tweet.created_at < last_update or tweet.user.screen_name == BOT_NAME:
+        print("SKIP "+str(tweet.created_at))
         continue
+    else:
+        print("USE "+str(tweet.created_at))
     # Ensure the @ + screen name was an actual mention directed at the bot
     for mention in tweet.entities['user_mentions']:
-        if mention['screen_name'] == 'bobbys_bot_test':
+        if mention['screen_name'] == BOT_NAME:
             if 'media' in tweet.entities:
                 # Use Vision API to get image from tweet's media_url and detect labels in it
                 image = vision_client.image(source_uri=tweet.entities['media'][0]['media_url'])
@@ -46,14 +57,16 @@ for tweet in tweets:
                     if i != labels.__len__()-1:
                         text += "\n"
                 print(labels[0].description + " - {}%".format(round(labels[i].score * 100, 1)) + "  " + str(tweet.id))
-                # Make tweet and add the mentioning tweet's ID to the list of tweets that have been replied to
+                # Make tweet
                 api.update_status(text, in_reply_to_status_id=tweet.id)
-                done_tweets.append(tweet.id)
-                done_tweets_file.writelines(str(tweet.id) + '\n')
                 break
             else:  # Tweet did not contain any images
                 print("No image - " + str(tweet.id))
                 api.update_status('@' + tweet.user.screen_name + ' ' + "Your tweet did not contain an image", in_reply_to_status_id=tweet.id)
-                done_tweets.append(tweet.id)
-                done_tweets_file.writelines(str(tweet.id) + '\n')
                 break
+
+# Update file with new "last updated" time
+date_file.seek(0)
+date_file.write(str(new_update_time))
+date_file.truncate()
+date_file.close()
